@@ -1,0 +1,109 @@
+.kxi_script:
+    script: 
+        - grep -vE '^export (AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|AWS_SESSION_TOKEN)="*"' $config > temp && mv temp $config
+        - bash scripts/kxi.sh $config $cloud $operation $name
+
+image: rahulmadaan/terraform-kxi:1.0
+
+stages:
+  - networking
+  - k8s
+  - post-provisioning
+  - bastion
+
+
+aws_networking_plan:
+    extends: .kxi_script
+    stage: networking
+    when: manual
+    variables:
+        config: ./client_config.env
+        name: "networking"
+        operation: "plan"
+        cloud: "aws"
+
+aws_networking_apply:
+    extends: .kxi_script
+    stage: networking
+    when: manual
+    variables:
+        config: ./client_config.env
+        name: "networking"
+        operation: "deploy"
+        cloud: "aws"
+    dependencies:
+      - aws_networking_plan
+
+aws_k8s_plan:
+    extends: .kxi_script
+    stage: k8s
+    when: manual
+    variables:
+        config: ./client_config.env
+        name: "k8s"
+        operation: "plan"
+        cloud: "aws"
+    dependencies:
+      - aws_networking_apply
+
+aws_k8s_apply:
+    extends: .kxi_script
+    stage: k8s
+    when: manual
+    variables:
+        config: ./client_config.env
+        name: "k8s"
+        operation: "deploy"
+        cloud: "aws"
+    dependencies:
+      - aws_k8s_plan
+
+
+aws_post_provisioning_plan:
+    extends: .kxi_script
+    stage: post-provisioning
+    when: manual
+    variables:
+        config: ./client_config.env
+        name: "post-provisioning"
+        operation: "plan"
+        cloud: "aws"
+    dependencies:
+      - aws_k8s_apply
+
+
+aws_post_provisioning_apply:
+    extends: .kxi_script
+    stage: post-provisioning
+    when: manual
+    variables:
+        config: ./client_config.env
+        name: "post-provisioning"
+        operation: "deploy"
+        cloud: "aws"
+    dependencies:
+      - aws_post_provisioning_plan
+
+aws_bastion_plan:
+    extends: .kxi_script
+    stage: bastion
+    when: manual
+    variables:
+        config: ./client_config.env
+        name: "bastion"
+        operation: "plan"
+        cloud: "aws"
+    dependencies:
+      - aws_post_provisioning_apply
+
+aws_bastion_apply:
+    extends: .kxi_script
+    stage: bastion
+    when: manual
+    variables:
+        config: ./client_config.env
+        name: "bastion"
+        operation: "deploy"
+        cloud: "aws"
+    dependencies:
+      - aws_bastion_plan
